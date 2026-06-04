@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "MeetToo",
+    "slug": "meettoo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B1020"
+        }
+      ]
+    ]
+  }
+}

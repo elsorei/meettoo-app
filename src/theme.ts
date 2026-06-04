@@ -1,0 +1,39 @@
+/**
+ * Central design tokens for MeetToo.
+ * Keeping colours, spacing and the intro timing in one place makes the brand
+ * easy to tune without hunting through components.
+ */
+
+export const colors = {
+  // Brand / intro (dark)
+  introBackground: '#0B1020', // deep night — matches the native splash background
+  introBackgroundMid: '#161235',
+  introBackgroundEnd: '#241A4D', // drifts toward violet
+  accent: '#7C6CF6', // indigo-violet
+  accentSoft: '#B7AEFF',
+  textOnDark: '#FFFFFF',
+  textOnDarkDim: 'rgba(255, 255, 255, 0.72)',
+  textOnDarkFaint: 'rgba(255, 255, 255, 0.55)',
+
+  // App (light)
+  background: '#FFFFFF',
+  surface: '#F4F5FB',
+  text: '#11131A',
+  textDim: '#5A6072',
+  border: '#E6E8F2',
+  primary: '#5A4AF4',
+} as const;
+
+/**
+ * Intro animation timeline (milliseconds).
+ * Total runtime ≈ word1In + holdAfterLead + taglineIn + hold + fadeOut.
+ * Kept deliberately short so it never feels like a gate in front of the app.
+ */
+export const introTiming = {
+  leadIn: 650, // "agenda…" fades/slides in
+  holdAfterLead: 480, // a beat on the ellipsis, the invitation
+  taglineIn: 700, // "meet anywhere with anyone" arrives
+  hold: 1050, // hold the full composition
+  fadeOut: 700, // dissolve to reveal the app
+  reduceMotionHold: 1200, // simple hold when motion is reduced
+} as const;
