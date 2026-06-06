@@ -26,14 +26,14 @@ export const colors = {
 
 /**
  * Intro animation timeline (milliseconds).
- * Total runtime ≈ word1In + holdAfterLead + taglineIn + hold + fadeOut.
- * Kept deliberately short so it never feels like a gate in front of the app.
+ * Total runtime ≈ leadIn + holdAfterLead + taglineIn + hold + fadeOut (~2.7s).
+ * Kept short and snappy so it can play on every launch without feeling like a gate.
  */
 export const introTiming = {
-  leadIn: 650, // "agenda…" fades/slides in
-  holdAfterLead: 480, // a beat on the ellipsis, the invitation
-  taglineIn: 700, // "meet anywhere with anyone" arrives
-  hold: 1050, // hold the full composition
-  fadeOut: 700, // dissolve to reveal the app
-  reduceMotionHold: 1200, // simple hold when motion is reduced
+  leadIn: 550, // "agenda…" fades/slides in
+  holdAfterLead: 350, // a beat on the ellipsis, the invitation
+  taglineIn: 600, // "meet anywhere with anyone" arrives
+  hold: 650, // hold the full composition
+  fadeOut: 550, // dissolve to reveal the app
+  reduceMotionHold: 900, // simple hold when motion is reduced
 } as const;
