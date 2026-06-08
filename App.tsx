@@ -3,7 +3,8 @@ import { StyleSheet, View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 
 import IntroScreen from './src/components/IntroScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import RootNavigator from './src/navigation/RootNavigator';
+import { AuthProvider } from './src/auth/AuthContext';
 import { SHOW_INTRO_ON_EVERY_LAUNCH } from './src/branding';
 
 // Hold the native splash so it hands off seamlessly to the animated intro
@@ -28,15 +29,17 @@ export default function App() {
   }, []);
 
   return (
-    <View style={styles.root}>
-      <HomeScreen />
-      {!introDone && (
-        <IntroScreen
-          onReady={handleIntroReady}
-          onFinish={() => setIntroDone(true)}
-        />
-      )}
-    </View>
+    <AuthProvider>
+      <View style={styles.root}>
+        <RootNavigator />
+        {!introDone && (
+          <IntroScreen
+            onReady={handleIntroReady}
+            onFinish={() => setIntroDone(true)}
+          />
+        )}
+      </View>
+    </AuthProvider>
   );
 }
 
