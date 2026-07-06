@@ -83,3 +83,41 @@ export interface AgendaEvent {
   created_at: string;
   updated_at: string;
 }
+
+/** Invitation / participation status of a guest on an event. */
+export type GuestStatus = 'pending' | 'accepted' | 'declined';
+
+/**
+ * A guest on an event. `user_id` / `name` are null when someone is invited by
+ * email before they have a MeetToo account. `invited_by` is the user who added
+ * them (null for guests the creator added at event creation).
+ */
+export interface EventGuest {
+  id: string;
+  event_id: string;
+  user_id: string | null;
+  email: string | null;
+  name: string | null;
+  status: GuestStatus;
+  invited_by: string | null;
+  invited_by_name: string | null;
+  created_at: string;
+}
+
+/**
+ * Full event detail from GET /api/events/:id — the list shape plus the guest
+ * roster, the creator's "guests can invite" setting, and `can_invite`: a
+ * SERVER-COMPUTED flag telling the current user whether they may add guests
+ * (true iff they own the event, or the setting is on and they are a guest).
+ * The UI only mirrors this flag; the real authorization lives in the API.
+ */
+export interface EventDetail extends AgendaEvent {
+  allow_guests_to_invite: boolean;
+  can_invite: boolean;
+  guests: EventGuest[];
+}
+
+/** Fields the app may PATCH on an event (owner only, enforced server-side). */
+export interface EventUpdate {
+  allow_guests_to_invite?: boolean;
+}
