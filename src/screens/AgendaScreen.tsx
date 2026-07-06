@@ -17,6 +17,7 @@ import type { AgendaEvent } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { WORDMARK } from '../branding';
 import { colors } from '../theme';
+import EventDetailScreen from './EventDetailScreen';
 
 const TYPE_LABEL: Record<AgendaEvent['type'], string> = {
   appointment: 'Appuntamento',
@@ -69,6 +70,7 @@ export default function AgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async (mode: 'initial' | 'refresh') => {
     if (mode === 'refresh') setRefreshing(true);
@@ -123,7 +125,14 @@ export default function AgendaScreen() {
         <FlatList
           data={events}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <EventRow event={item} />}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSelectedId(item.id)}
+            >
+              <EventRow event={item} />
+            </TouchableOpacity>
+          )}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl
@@ -142,6 +151,12 @@ export default function AgendaScreen() {
           }
         />
       )}
+
+      <EventDetailScreen
+        eventId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onChanged={() => load('refresh')}
+      />
     </SafeAreaView>
   );
 }
