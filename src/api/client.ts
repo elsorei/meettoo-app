@@ -82,6 +82,9 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, code, message, details);
 }
 
+/** Default network timeout: nessuna richiesta resta appesa per sempre. */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /** Low-level fetch that does NOT attempt a refresh. Returns the raw Response. */
 async function rawFetch(path: string, opts: RequestOptions): Promise<Response> {
   if (!isApiConfigured) {
@@ -96,12 +99,30 @@ async function rawFetch(path: string, opts: RequestOptions): Promise<Response> {
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
-  return fetch(buildUrl(path, opts.query), {
-    method: opts.method ?? 'GET',
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    signal: opts.signal,
-  });
+  // Timeout: combina l'eventuale signal del chiamante con uno interno.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const onCallerAbort = () => controller.abort();
+  opts.signal?.addEventListener('abort', onCallerAbort);
+
+  try {
+    return await fetch(buildUrl(path, opts.query), {
+      method: opts.method ?? 'GET',
+      headers,
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onCallerAbort);
+  }
+}
+
+/** True se l'errore è di rete/timeout (non una risposta HTTP del server). */
+export function isNetworkError(e: unknown): boolean {
+  if (e instanceof ApiError) return false;
+  const name = (e as { name?: string })?.name;
+  return name === 'AbortError' || name === 'TypeError' || e instanceof TypeError;
 }
 
 // Single-flight refresh: concurrent 401s share one refresh request.

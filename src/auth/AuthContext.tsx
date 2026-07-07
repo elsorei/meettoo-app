@@ -5,6 +5,10 @@
  * /auth/me. It also wires the HTTP client's session hooks so the client can
  * read the current access token, persist refreshed tokens, and trigger logout
  * when a refresh fails.
+ *
+ * Offline: un errore di RETE all'avvio NON butta fuori l'utente — i token
+ * restano e la sessione riparte come autenticata (le schermate mostrano i
+ * loro stati di errore/retry). Solo un vero 401 dal server cancella i token.
  */
 import {
   createContext,
@@ -18,7 +22,7 @@ import {
 } from 'react';
 
 import * as authApi from '../api/auth';
-import { attachSession } from '../api/client';
+import { ApiError, attachSession, isNetworkError } from '../api/client';
 import type { SessionUser } from '../api/types';
 import { clearTokens, loadTokens, saveTokens, type AuthTokens } from '../lib/tokenStore';
 
@@ -28,7 +32,14 @@ interface AuthContextValue {
   status: Status;
   user: SessionUser | null;
   signIn: (email: string, password: string) => Promise<void>;
+  signUp: (input: { email: string; password: string; name: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Logout da TUTTI i dispositivi. */
+  signOutEverywhere: () => Promise<void>;
+  /** Cancella definitivamente l'account (richiede la password). */
+  deleteAccount: (password: string) => Promise<void>;
+  /** Ricarica /auth/me (es. dopo un update del profilo o al retry offline). */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -73,8 +84,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         setUser(me);
         setStatus('authenticated');
-      } catch {
+      } catch (e) {
         if (!active) return;
+        if (isNetworkError(e)) {
+          // Offline (aereo, metro, ...): la sessione resta valida. Il profilo
+          // arriverà al prossimo refreshUser()/retry con rete.
+          setStatus('authenticated');
+          return;
+        }
+        // Risposta vera del server (401/403/...): sessione morta.
         tokensRef.current = null;
         await clearTokens();
         setStatus('unauthenticated');
@@ -85,8 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const result = await authApi.login(email, password);
+  const adoptSession = useCallback(async (result: {
+    accessToken: string;
+    refreshToken: string;
+    user: SessionUser;
+  }) => {
     const next: AuthTokens = {
       accessToken: result.accessToken,
       refreshToken: result.refreshToken,
@@ -97,21 +118,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('authenticated');
   }, []);
 
-  const signOut = useCallback(async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      /* best effort — clear locally regardless */
-    }
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      await adoptSession(await authApi.login(email, password));
+    },
+    [adoptSession]
+  );
+
+  const signUp = useCallback(
+    async (input: { email: string; password: string; name: string }) => {
+      await adoptSession(await authApi.register(input));
+    },
+    [adoptSession]
+  );
+
+  const clearSession = useCallback(async () => {
     tokensRef.current = null;
     await clearTokens();
     setUser(null);
     setStatus('unauthenticated');
   }, []);
 
+  const signOut = useCallback(async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      /* best effort — clear locally regardless */
+    }
+    await clearSession();
+  }, [clearSession]);
+
+  const signOutEverywhere = useCallback(async () => {
+    try {
+      await authApi.logoutAll();
+    } catch {
+      /* best effort — clear locally regardless */
+    }
+    await clearSession();
+  }, [clearSession]);
+
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      // Se il server rifiuta (password errata, rete giù) l'errore risale
+      // alla UI e la sessione locale resta intatta.
+      await authApi.deleteAccount(password);
+      await clearSession();
+    },
+    [clearSession]
+  );
+
+  const refreshUser = useCallback(async () => {
+    try {
+      const me = await authApi.getMe();
+      setUser(me);
+    } catch (e) {
+      if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        await clearSession();
+      }
+      // Errori di rete: silenziosi, riproverà chi ha chiamato.
+    }
+  }, [clearSession]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ status, user, signIn, signOut }),
-    [status, user, signIn, signOut]
+    () => ({
+      status,
+      user,
+      signIn,
+      signUp,
+      signOut,
+      signOutEverywhere,
+      deleteAccount,
+      refreshUser,
+    }),
+    [status, user, signIn, signUp, signOut, signOutEverywhere, deleteAccount, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

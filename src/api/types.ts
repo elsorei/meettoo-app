@@ -41,6 +41,7 @@ export interface SessionUser {
   phone: string | null;
   photoUrl: string | null;
   timezone: string;
+  emailVerified: boolean;
 }
 
 export interface LoginResult {
@@ -111,13 +112,40 @@ export interface EventGuest {
  * (true iff they own the event, or the setting is on and they are a guest).
  * The UI only mirrors this flag; the real authorization lives in the API.
  */
+/** Registered participant of an event (event_participants). */
+export interface EventParticipant {
+  id: string;
+  user_id: string;
+  role: 'organizer' | 'participant' | 'reserve';
+  confirmation: 'pending' | 'accepted' | 'declined';
+  display_name: string;
+  photo_url: string | null;
+}
+
 export interface EventDetail extends AgendaEvent {
+  description: string | null;
   allow_guests_to_invite: boolean;
   can_invite: boolean;
   guests: EventGuest[];
+  participants: EventParticipant[];
 }
 
-/** Fields the app may PATCH on an event (owner only, enforced server-side). */
+/** Fields the app may update on an event (owner only, enforced server-side). */
 export interface EventUpdate {
-  allow_guests_to_invite?: boolean;
+  allowGuestsToInvite?: boolean;
 }
+
+/** Payload for POST /api/events. */
+export interface CreateEventInput {
+  type: EventType;
+  title: string;
+  description?: string;
+  eventDate: string; // YYYY-MM-DD
+  startTime?: string; // HH:MM
+  endTime?: string; // HH:MM
+  locationName?: string;
+  visibility?: 'private' | 'invitees' | 'friends' | 'public_view' | 'public_open';
+  isPrivate?: boolean;
+}
+
+export type RsvpAnswer = 'accepted' | 'declined';

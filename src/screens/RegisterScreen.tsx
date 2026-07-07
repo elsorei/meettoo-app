@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,31 +16,39 @@ import { ApiError } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { FormInput, PrimaryButton } from '../components/ui';
 import type { RootStackParamList } from '../navigation/RootNavigator';
-import { SLOGAN_TAGLINE, WORDMARK } from '../branding';
+import { WORDMARK } from '../branding';
 import { colors, spacing } from '../theme';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
 
-/** Email + password sign-in against POST /api/auth/login. */
-export default function LoginScreen({ navigation }: Props) {
-  const { signIn } = useAuth();
-  const [email, setEmail] = useState('');
+/** Registrazione consumer: nome + email + password. */
+export default function RegisterScreen({ navigation, route }: Props) {
+  const { signUp } = useAuth();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState(route.params?.email ?? '');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !submitting;
+  const passwordTooShort = password.length > 0 && password.length < 8;
+  const mismatch = confirm.length > 0 && confirm !== password;
+  const canSubmit =
+    name.trim().length > 0 &&
+    email.trim().length > 3 &&
+    password.length >= 8 &&
+    confirm === password &&
+    !submitting;
 
   async function onSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
     try {
-      await signIn(email.trim(), password);
+      await signUp({ email: email.trim(), password, name: name.trim() });
+      // Successo: il RootNavigator commuta da solo sullo stack autenticato.
     } catch (e) {
-      const message =
-        e instanceof ApiError ? e.message : 'Impossibile accedere. Riprova.';
-      setError(message);
+      setError(e instanceof ApiError ? e.message : 'Registrazione non riuscita. Riprova.');
       setSubmitting(false);
     }
   }
@@ -51,12 +60,24 @@ export default function LoginScreen({ navigation }: Props) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.header}>
             <Text style={styles.wordmark}>{WORDMARK}</Text>
-            <Text style={styles.tagline}>{SLOGAN_TAGLINE}</Text>
+            <Text style={styles.tagline}>Crea il tuo account in pochi secondi</Text>
           </View>
 
+          <FormInput
+            label="Nome"
+            value={name}
+            onChangeText={setName}
+            placeholder="Il tuo nome"
+            autoCapitalize="words"
+            textContentType="name"
+            editable={!submitting}
+          />
           <FormInput
             label="Email"
             value={email}
@@ -72,26 +93,28 @@ export default function LoginScreen({ navigation }: Props) {
             label="Password"
             value={password}
             onChangeText={setPassword}
+            placeholder="Almeno 8 caratteri"
+            secureTextEntry
+            textContentType="newPassword"
+            editable={!submitting}
+            error={passwordTooShort ? 'La password deve avere almeno 8 caratteri.' : null}
+          />
+          <FormInput
+            label="Conferma password"
+            value={confirm}
+            onChangeText={setConfirm}
             placeholder="••••••••"
             secureTextEntry
-            textContentType="password"
             editable={!submitting}
             onSubmitEditing={onSubmit}
             returnKeyType="go"
+            error={mismatch ? 'Le password non coincidono.' : null}
           />
-
-          <TouchableOpacity
-            style={styles.forgotLink}
-            onPress={() => navigation.navigate('ForgotPassword', { email: email.trim() || undefined })}
-            hitSlop={8}
-          >
-            <Text style={styles.forgotText}>Password dimenticata?</Text>
-          </TouchableOpacity>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <PrimaryButton
-            title="Accedi"
+            title="Crea account"
             onPress={onSubmit}
             disabled={!canSubmit}
             loading={submitting}
@@ -99,14 +122,14 @@ export default function LoginScreen({ navigation }: Props) {
 
           <TouchableOpacity
             style={styles.switchLink}
-            onPress={() => navigation.navigate('Register', { email: email.trim() || undefined })}
+            onPress={() => navigation.navigate('Login')}
             hitSlop={8}
           >
             <Text style={styles.switchText}>
-              Nuovo su MeetToo? <Text style={styles.switchAction}>Registrati</Text>
+              Hai già un account? <Text style={styles.switchAction}>Accedi</Text>
             </Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -115,8 +138,13 @@ export default function LoginScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: spacing.xl, justifyContent: 'center' },
-  header: { marginBottom: spacing.xxl },
+  container: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    justifyContent: 'center',
+    paddingVertical: spacing.xxl,
+  },
+  header: { marginBottom: spacing.xl },
   wordmark: {
     color: colors.primary,
     fontSize: 32,
@@ -124,9 +152,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   tagline: { color: colors.textDim, fontSize: 15, marginTop: 6 },
-  forgotLink: { alignSelf: 'flex-end', marginTop: spacing.sm },
-  forgotText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  error: { color: colors.danger, fontSize: 14, marginTop: spacing.sm },
+  error: { color: colors.danger, fontSize: 14, marginTop: spacing.md },
   switchLink: { alignItems: 'center', marginTop: spacing.xl },
   switchText: { color: colors.textDim, fontSize: 14 },
   switchAction: { color: colors.primary, fontWeight: '600' },

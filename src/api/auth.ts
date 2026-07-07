@@ -32,7 +32,39 @@ export function getMe(): Promise<SessionUser> {
   return request<SessionUser>('/api/auth/me');
 }
 
-/** POST /api/auth/logout — revokes the refresh token server-side. */
+/** POST /api/auth/logout — revokes this device's refresh token server-side. */
 export function logout(): Promise<unknown> {
   return request<unknown>('/api/auth/logout', { method: 'POST' });
+}
+
+/** POST /api/auth/logout-all — revokes every session on every device. */
+export function logoutAll(): Promise<unknown> {
+  return request<unknown>('/api/auth/logout-all', { method: 'POST' });
+}
+
+/** POST /api/auth/forgot-password — sends the reset link (never enumerates). */
+export function forgotPassword(email: string): Promise<unknown> {
+  return request<unknown>('/api/auth/forgot-password', {
+    method: 'POST',
+    auth: false,
+    body: { email },
+  });
+}
+
+/** PUT /api/auth/me — update profile fields (name, phone). */
+export function updateProfile(fields: { name?: string; phone?: string }): Promise<SessionUser> {
+  return request<SessionUser>('/api/auth/me', { method: 'PUT', body: fields });
+}
+
+/** POST /api/auth/verify-email/request — re-sends the verification email. */
+export function requestEmailVerification(): Promise<unknown> {
+  return request<unknown>('/api/auth/verify-email/request', { method: 'POST' });
+}
+
+/** DELETE /api/auth/me — permanently deletes the account (needs the password). */
+export function deleteAccount(password: string): Promise<unknown> {
+  return request<unknown>('/api/auth/me', {
+    method: 'DELETE',
+    body: { password },
+  });
 }

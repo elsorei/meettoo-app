@@ -22,6 +22,18 @@ export const colors = {
   textDim: '#5A6072',
   border: '#E6E8F2',
   primary: '#5A4AF4',
+  danger: '#D14343',
+  success: '#2E9E5B',
+} as const;
+
+/** Scala di spacing condivisa (px). */
+export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  xxl: 32,
 } as const;
 
 /**
