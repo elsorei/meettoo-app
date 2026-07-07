@@ -72,8 +72,10 @@ export default function CreateEventScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Promemoria e impegni possono non avere orari; appuntamenti/eventi sì.
-  const needsTimes = type === 'appointment' || type === 'gathering';
+  // Il server richiede gli orari per tutto tranne i promemoria
+  // (createEventSchema: appointment e commitment li esigono, gathering li
+  // accetta — li mandiamo sempre per coerenza UI).
+  const needsTimes = type !== 'reminder';
   const timesInvalid = needsTimes && end <= start;
   const canSubmit = title.trim().length > 0 && !timesInvalid && !submitting;
 

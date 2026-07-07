@@ -76,9 +76,11 @@ export default function EventDetailScreen({ navigation, route }: Props) {
       const detail = await getEvent(id, signal);
       setEvent(detail);
     } catch (e) {
-      if ((e as { name?: string })?.name === 'AbortError') return;
+      // Ignora SOLO l'abort del chiamante (unmount): il timeout interno del
+      // client è pure un AbortError, ma deve mostrare errore + Riprova.
+      if (signal?.aborted) return;
       setError(
-        e instanceof ApiError ? e.message : 'Impossibile caricare l\'evento.'
+        e instanceof ApiError ? e.message : 'Impossibile caricare l\'evento. Controlla la connessione.'
       );
     } finally {
       setLoading(false);
@@ -107,10 +109,14 @@ export default function EventDetailScreen({ navigation, route }: Props) {
       if (!event || answering) return;
       setAnswering(answer);
       try {
+        // Se l'utente è sia participant sia guest, aggiorna ENTRAMBI i
+        // record: my_confirmation guida il badge in agenda e l'auto-conferma
+        // dell'evento, lo status guest la lista invitati.
+        if (myParticipant && myParticipant.role !== 'organizer') {
+          await confirmParticipation(event.id, answer);
+        }
         if (myGuest) {
           await respondAsGuest(event.id, answer);
-        } else {
-          await confirmParticipation(event.id, answer);
         }
         await load(event.id);
       } catch (e) {
@@ -122,7 +128,7 @@ export default function EventDetailScreen({ navigation, route }: Props) {
         setAnswering(null);
       }
     },
-    [event, myGuest, answering, load]
+    [event, myGuest, myParticipant, answering, load]
   );
 
   const handleShare = useCallback(() => {

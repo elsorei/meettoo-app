@@ -56,10 +56,11 @@ function EventRow({ event }: { event: AgendaEvent }) {
       {event.location_name ? (
         <Text style={styles.cardMeta}>{event.location_name}</Text>
       ) : null}
-      {event.participant_count > 0 ? (
+      {Number(event.participant_count) > 0 ? (
         <Text style={styles.cardMeta}>
-          {event.participant_count} partecipant
-          {event.participant_count === 1 ? 'e' : 'i'}
+          {/* COUNT(*) arriva come stringa da node-postgres: normalizza. */}
+          {Number(event.participant_count)} partecipant
+          {Number(event.participant_count) === 1 ? 'e' : 'i'}
         </Text>
       ) : null}
       {event.my_confirmation === 'pending' ? (
@@ -75,7 +76,7 @@ function EventRow({ event }: { event: AgendaEvent }) {
  * evento o risposto a un invito).
  */
 export default function AgendaScreen({ navigation }: Props) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [events, setEvents] = useState<AgendaEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +84,9 @@ export default function AgendaScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const pageRef = useRef(1);
   const totalPagesRef = useRef(1);
+  // Letta dal focus effect senza entrare nelle sue deps (evita stale closure).
+  const hasEventsRef = useRef(false);
+  hasEventsRef.current = events.length > 0;
 
   const load = useCallback(async (mode: 'initial' | 'refresh' | 'more') => {
     if (mode === 'refresh') setRefreshing(true);
@@ -110,20 +114,15 @@ export default function AgendaScreen({ navigation }: Props) {
   }, []);
 
   // Al focus (primo mount incluso): ricarica per riflettere eventi creati,
-  // inviti risposti, ecc. Nessun setState dopo l'unmount: il cleanup di
-  // useFocusEffect scatta alla perdita di focus, il flag lo previene.
+  // inviti risposti, ecc. Il primo caricamento mostra lo spinner pieno; i
+  // successivi sono refresh silenziosi che non smontano la lista.
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      void (async () => {
-        if (!active) return;
-        await load(events.length === 0 ? 'initial' : 'refresh');
-      })();
-      return () => {
-        active = false;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [load])
+      void load(hasEventsRef.current ? 'refresh' : 'initial');
+      // Sessione ripristinata offline: user è null finché una getMe non
+      // riesce. Riprova qui, dove l'utente torna con la rete attiva.
+      if (!user) void refreshUser();
+    }, [load, user, refreshUser])
   );
 
   const onEndReached = () => {

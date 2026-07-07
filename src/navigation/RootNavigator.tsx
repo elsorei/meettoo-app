@@ -1,5 +1,11 @@
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { NavigationContainer, DefaultTheme, type LinkingOptions } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  createNavigationContainerRef,
+  type LinkingOptions,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
 
@@ -11,6 +17,7 @@ import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import LoginScreen from '../screens/LoginScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import RegisterScreen from '../screens/RegisterScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import { colors } from '../theme';
 
 /** Route params of the whole app — the single source of truth for navigation. */
@@ -19,6 +26,7 @@ export type RootStackParamList = {
   Login: undefined;
   Register: { email?: string } | undefined;
   ForgotPassword: { email?: string } | undefined;
+  ResetPassword: { token?: string } | undefined;
   // Authenticated
   Agenda: undefined;
   EventDetail: { eventId: string };
@@ -27,12 +35,12 @@ export type RootStackParamList = {
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 /**
  * Deep link: meettoo://e/<eventId> (e in futuro https://<dominio>/e/<id>)
  * apre direttamente il dettaglio evento — è il link contenuto nelle email
- * d'invito. Se l'utente non è loggato atterra sul Login e, una volta dentro,
- * ritroverà l'invito in agenda.
+ * d'invito. meettoo://reset-password?token=... apre il completamento reset.
  */
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: [Linking.createURL('/'), 'meettoo://'],
@@ -40,10 +48,17 @@ const linking: LinkingOptions<RootStackParamList> = {
     screens: {
       EventDetail: 'e/:eventId',
       Register: 'register',
-      ForgotPassword: 'reset-password',
+      ResetPassword: 'reset-password',
     },
   },
 };
+
+/** Estrae l'eventId da un URL d'invito (meettoo://e/<id> o https://…/e/<id>). */
+function eventIdFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const match = /(?:^|\/)e\/([0-9a-f-]{16,})/i.exec(url);
+  return match ? match[1] : null;
+}
 
 const navTheme = {
   ...DefaultTheme,
@@ -59,6 +74,30 @@ const navTheme = {
 
 export default function RootNavigator() {
   const { status } = useAuth();
+  const url = Linking.useURL();
+
+  // Un invito aperto da sloggato (EventDetail non esiste in quello stack)
+  // viene parcheggiato qui e ripreso appena la sessione diventa attiva:
+  // registrarsi dal link porta DRITTI all'evento — il cuore del loop virale.
+  const pendingEventIdRef = useRef<string | null>(null);
+  const eventId = eventIdFromUrl(url);
+  if (eventId && status !== 'authenticated') {
+    pendingEventIdRef.current = eventId;
+  }
+
+  useEffect(() => {
+    if (status !== 'authenticated' || !pendingEventIdRef.current) return;
+    const target = pendingEventIdRef.current;
+    // Attendi che il container sia pronto (il primo render dopo il login).
+    const timer = setInterval(() => {
+      if (navigationRef.isReady()) {
+        clearInterval(timer);
+        pendingEventIdRef.current = null;
+        navigationRef.navigate('EventDetail', { eventId: target });
+      }
+    }, 100);
+    return () => clearInterval(timer);
+  }, [status]);
 
   if (status === 'loading') {
     return (
@@ -69,7 +108,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme} linking={linking}>
+    <NavigationContainer ref={navigationRef} theme={navTheme} linking={linking}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {status === 'authenticated' ? (
           <>
@@ -91,6 +130,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
             <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+            <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
           </>
         )}
       </Stack.Navigator>

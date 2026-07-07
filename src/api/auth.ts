@@ -51,6 +51,15 @@ export function forgotPassword(email: string): Promise<unknown> {
   });
 }
 
+/** POST /api/auth/reset-password — completes the reset with the email token. */
+export function resetPassword(token: string, newPassword: string): Promise<unknown> {
+  return request<unknown>('/api/auth/reset-password', {
+    method: 'POST',
+    auth: false,
+    body: { token, newPassword },
+  });
+}
+
 /** PUT /api/auth/me — update profile fields (name, phone). */
 export function updateProfile(fields: { name?: string; phone?: string }): Promise<SessionUser> {
   return request<SessionUser>('/api/auth/me', { method: 'PUT', body: fields });

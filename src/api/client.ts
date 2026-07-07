@@ -125,22 +125,32 @@ export function isNetworkError(e: unknown): boolean {
   return name === 'AbortError' || name === 'TypeError' || e instanceof TypeError;
 }
 
-// Single-flight refresh: concurrent 401s share one refresh request.
-let refreshInFlight: Promise<AuthTokens | null> | null = null;
+/**
+ * Esiti del refresh:
+ *  - AuthTokens → riuscito, riprova la richiesta
+ *  - 'expired'  → il SERVER ha rifiutato il refresh token: sessione morta
+ *  - 'unavailable' → rete giù / 5xx / 429: la sessione resta valida,
+ *    NON va cancellata (si ritenterà più tardi)
+ */
+type RefreshOutcome = AuthTokens | 'expired' | 'unavailable';
 
-async function refreshTokens(): Promise<AuthTokens | null> {
+// Single-flight refresh: concurrent 401s share one refresh request.
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+async function refreshTokens(): Promise<RefreshOutcome> {
   const current = session?.getTokens();
-  if (!current?.refreshToken) return null;
+  if (!current?.refreshToken) return 'expired';
 
   if (!refreshInFlight) {
-    refreshInFlight = (async () => {
+    refreshInFlight = (async (): Promise<RefreshOutcome> => {
       try {
         const res = await rawFetch('/api/auth/refresh', {
           method: 'POST',
           auth: false,
           body: { refreshToken: current.refreshToken },
         });
-        if (!res.ok) return null;
+        if (res.status === 401 || res.status === 403) return 'expired';
+        if (!res.ok) return 'unavailable';
         const json = (await res.json()) as { success: boolean; data: AuthTokensResult };
         const next: AuthTokens = {
           accessToken: json.data.accessToken,
@@ -149,7 +159,7 @@ async function refreshTokens(): Promise<AuthTokens | null> {
         session?.onTokensRefreshed(next);
         return next;
       } catch {
-        return null;
+        return 'unavailable';
       } finally {
         refreshInFlight = null;
       }
@@ -162,17 +172,30 @@ async function refreshTokens(): Promise<AuthTokens | null> {
  * Make a request, unwrap the envelope, and return `data` typed as `T`.
  * On a 401 for an authenticated request, refreshes once and retries.
  */
+/** Gestione condivisa del 401: refresh e retry, o sessione scaduta. */
+async function handleUnauthorized(
+  res: Response,
+  path: string,
+  opts: RequestOptions
+): Promise<Response> {
+  const refreshed = await refreshTokens();
+  if (refreshed === 'expired') {
+    // Solo un vero rifiuto del server invalida la sessione locale.
+    session?.onSessionExpired();
+    throw await parseError(res);
+  }
+  if (refreshed === 'unavailable') {
+    // Rete giù o server in difficoltà: i token restano, l'errore risale.
+    throw await parseError(res);
+  }
+  return rawFetch(path, opts);
+}
+
 export async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   let res = await rawFetch(path, opts);
 
   if (res.status === 401 && opts.auth !== false && session?.getTokens()) {
-    const refreshed = await refreshTokens();
-    if (refreshed) {
-      res = await rawFetch(path, opts);
-    } else {
-      session.onSessionExpired();
-      throw await parseError(res);
-    }
+    res = await handleUnauthorized(res, path, opts);
   }
 
   if (!res.ok) throw await parseError(res);
@@ -191,13 +214,7 @@ export async function requestEnvelope<T>(
   let res = await rawFetch(path, opts);
 
   if (res.status === 401 && opts.auth !== false && session?.getTokens()) {
-    const refreshed = await refreshTokens();
-    if (refreshed) {
-      res = await rawFetch(path, opts);
-    } else {
-      session.onSessionExpired();
-      throw await parseError(res);
-    }
+    res = await handleUnauthorized(res, path, opts);
   }
 
   if (!res.ok) throw await parseError(res);
