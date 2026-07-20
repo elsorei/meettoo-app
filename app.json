@@ -10,8 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "it.studiorei.meettoo",
-      "buildNumber": "1",
-      "associatedDomains": ["applinks:REPLACE-WITH-YOUR-API-DOMAIN"]
+      "buildNumber": "1"
     },
     "android": {
       "package": "it.studiorei.meettoo",
@@ -20,21 +19,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B1020"
-      },
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "REPLACE-WITH-YOUR-API-DOMAIN",
-              "pathPrefix": "/e"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ]
+      }
     },
     "plugins": [
       [
