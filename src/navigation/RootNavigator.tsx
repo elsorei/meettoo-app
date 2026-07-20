@@ -42,8 +42,25 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
  * apre direttamente il dettaglio evento — è il link contenuto nelle email
  * d'invito. meettoo://reset-password?token=... apre il completamento reset.
  */
+// Universal/App Links: gli inviti web sono https://<dominio-api>/e/<id>.
+// Registrare il prefisso https permette a react-navigation di instradarli
+// automaticamente quando l'OS apre l'app via universal link.
+const API_ORIGIN = (() => {
+  try {
+    return process.env.EXPO_PUBLIC_API_URL
+      ? new URL(process.env.EXPO_PUBLIC_API_URL).origin
+      : null;
+  } catch {
+    return null;
+  }
+})();
+
 const linking: LinkingOptions<RootStackParamList> = {
-  prefixes: [Linking.createURL('/'), 'meettoo://'],
+  prefixes: [
+    Linking.createURL('/'),
+    'meettoo://',
+    ...(API_ORIGIN ? [API_ORIGIN] : []),
+  ],
   config: {
     screens: {
       EventDetail: 'e/:eventId',
