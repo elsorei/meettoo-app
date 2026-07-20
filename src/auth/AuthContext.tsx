@@ -25,6 +25,7 @@ import * as authApi from '../api/auth';
 import { ApiError, attachSession, isNetworkError } from '../api/client';
 import type { SessionUser } from '../api/types';
 import { clearTokens, loadTokens, saveTokens, type AuthTokens } from '../lib/tokenStore';
+import { registerForPush } from '../lib/push';
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -117,6 +118,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(result.user);
     setStatus('authenticated');
   }, []);
+
+  // A sessione attiva, registra il dispositivo per le push (best-effort,
+  // silenzioso su simulatore/permesso negato).
+  useEffect(() => {
+    if (status === 'authenticated') {
+      void registerForPush();
+    }
+  }, [status]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {

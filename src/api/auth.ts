@@ -42,6 +42,11 @@ export function logoutAll(): Promise<unknown> {
   return request<unknown>('/api/auth/logout-all', { method: 'POST' });
 }
 
+/** PUT /api/auth/fcm-token — registra l'Expo push token del dispositivo. */
+export function updateFcmToken(fcmToken: string): Promise<unknown> {
+  return request<unknown>('/api/auth/fcm-token', { method: 'PUT', body: { fcmToken } });
+}
+
 /** POST /api/auth/forgot-password — sends the reset link (never enumerates). */
 export function forgotPassword(email: string): Promise<unknown> {
   return request<unknown>('/api/auth/forgot-password', {

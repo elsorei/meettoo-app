@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import {
   NavigationContainer,
@@ -10,6 +10,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
 
 import { useAuth } from '../auth/AuthContext';
+import { addNotificationTapListener } from '../lib/push';
 import AgendaScreen from '../screens/AgendaScreen';
 import CreateEventScreen from '../screens/CreateEventScreen';
 import EventDetailScreen from '../screens/EventDetailScreen';
@@ -93,19 +94,36 @@ export default function RootNavigator() {
   const { status } = useAuth();
   const url = Linking.useURL();
 
+  // status letto dentro callback registrate una sola volta (tap notifica):
+  // un ref evita la stale closure.
+  const statusRef = useRef(status);
+  statusRef.current = status;
+
   // Un invito aperto da sloggato (EventDetail non esiste in quello stack)
   // viene parcheggiato qui e ripreso appena la sessione diventa attiva:
   // registrarsi dal link porta DRITTI all'evento — il cuore del loop virale.
   const pendingEventIdRef = useRef<string | null>(null);
+
+  // Porta l'utente sull'evento: naviga subito se autenticato e pronto,
+  // altrimenti parcheggia e riprova al cambio di stato. Sorgenti: universal
+  // link / deep link / tap su una notifica push.
+  const routeToEvent = useCallback((eid: string) => {
+    if (statusRef.current === 'authenticated' && navigationRef.isReady()) {
+      navigationRef.navigate('EventDetail', { eventId: eid });
+    } else {
+      pendingEventIdRef.current = eid;
+    }
+  }, []);
+
   const eventId = eventIdFromUrl(url);
   if (eventId && status !== 'authenticated') {
     pendingEventIdRef.current = eventId;
   }
 
+  // Flush del pending quando la sessione diventa attiva.
   useEffect(() => {
     if (status !== 'authenticated' || !pendingEventIdRef.current) return;
     const target = pendingEventIdRef.current;
-    // Attendi che il container sia pronto (il primo render dopo il login).
     const timer = setInterval(() => {
       if (navigationRef.isReady()) {
         clearInterval(timer);
@@ -115,6 +133,9 @@ export default function RootNavigator() {
     }, 100);
     return () => clearInterval(timer);
   }, [status]);
+
+  // Tap su una notifica push che riguarda un evento → apri l'evento.
+  useEffect(() => addNotificationTapListener(routeToEvent), [routeToEvent]);
 
   if (status === 'loading') {
     return (
