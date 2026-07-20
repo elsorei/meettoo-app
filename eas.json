@@ -16,14 +16,14 @@
       "channel": "preview",
       "ios": { "simulator": false },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-API.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://meettoo-api-production.up.railway.app"
       }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://REPLACE-WITH-YOUR-API.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://meettoo-api-production.up.railway.app"
       }
     }
   },
